@@ -148,6 +148,28 @@
             border-bottom: 2px solid #eee;
             padding-bottom: 5px;
         }
+        
+        /* Container for the new template download links */
+        #download-links-area {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+        .template-btn {
+            background-color: #2e7d32; /* Green for Excel */
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+            font-weight: 600;
+            display: inline-block;
+            transition: background-color 0.2s;
+        }
+        .template-btn:hover {
+            background-color: #1b5e20;
+        }
     </style>
 </head>
 <body>
@@ -178,13 +200,15 @@
         <div class="table-title">Detailed Contributions [%]</div>
         <div style="overflow-x: auto;">
             <table id="data-table">
-                </table>
+            </table>
         </div>
         
         <div class="btn-group">
             <button class="action-btn" onclick="downloadChart()">Download Chart Image</button>
             <button class="action-btn secondary" onclick="copyTable()">Copy Table to Clipboard</button>
         </div>
+
+        <div id="download-links-area"></div>
     </div>
 
     <script>
@@ -195,7 +219,7 @@
 
         const impactCategories = [
             "GWP-t", "ODP", "AP", "EP-fw", "EP-m",
-            "EP-t", "POCP", "ADPf", "ADPe", "WDP", "PERT", "PENRT"
+            "EP-t", "POCP", "ADPf", "ADPe", "WDP", "PERT", "PENRT", 
         ];
 
         const mapping = {
@@ -227,6 +251,90 @@
             "C4":    "#3E2723",  // Dark Brown
             "D":     "#8FAFBC"   // Neutral
         };
+        
+        // --- Template Configuration for Excel Export ---
+        const templateColumnsDE = ["Indikator", "Exponential", "A1-A3", "A1", "A2", "A3", "A4", "A5", "B1", "B1/1", "B1/2", "B1/3", "B2", "B2/1", "B2/2", "B2/3", "B3", "B3/1", "B3/2", "B3/3", "B4", "B4/1", "B4/2", "B4/3", "B5", "B5/1", "B5/2", "B5/3", "B6", "B6/1", "B6/2", "B6/3", "B7", "B7/1", "B7/2", "B7/3", "C1", "C2", "C2/1", "C2/2", "C2/3", "C3", "C3/1", "C3/2", "C3/3", "C4", "C4/1", "C4/2", "C4/3", "D", "D/1", "D/2", "D/3"];
+        const templateColumnsEN = ["Indicator", "Exponential", "A1-A3", "A1", "A2", "A3", "A4", "A5", "B1", "B1/1", "B1/2", "B1/3", "B2", "B2/1", "B2/2", "B2/3", "B3", "B3/1", "B3/2", "B3/3", "B4", "B4/1", "B4/2", "B4/3", "B5", "B5/1", "B5/2", "B5/3", "B6", "B6/1", "B6/2", "B6/3", "B7", "B7/1", "B7/2", "B7/3", "C1", "C2", "C2/1", "C2/2", "C2/3", "C3", "C3/1", "C3/2", "C3/3", "C4", "C4/1", "C4/2", "C4/3", "D", "D/1", "D/2", "D/3"];
+
+        const deRows = [
+            { name: "Globales Erwärmungspotenzial total (GWP-total)", code: "GWP-total" },
+            { name: "Globales Erwärmungspotenzial fossil (GWP-fossil)", code: "GWP-fossil" },
+            { name: "Globales Erwärmungspotenzial biogen (GWP-biogenic)", code: "GWP-biogenic" },
+            { name: "Globales Erwärmungspotenzial luluc (GWP-luluc)", code: "GWP-luluc" },
+            { name: "Abbau Potential der stratosphärischen Ozonschicht (ODP)", code: "ODP" },
+            { name: "Versauerungspotenzial von Boden und Wasser (AP)", code: "AP" },
+            { name: "Eutrophierungspotenzial Süßwasser (EP-freshwater)", code: "EP-freshwater" },
+            { name: "Eutrophierungspotenzial Salzwasser (EP-marine)", code: "EP-marine" },
+            { name: "Eutrophierungspotenzial Land (EP-terrestrial)", code: "EP-terrestrial" },
+            { name: "Bildungspotential für troposphärisches Ozon (POCP)", code: "POCP" },
+            { name: "Potenzial für den abiotischen Abbau nicht fossiler Ressourcen (ADPE)", code: "ADPE" },
+            { name: "Potenzial für den abiotischen Abbau fossiler Brennstoffe (ADPF)", code: "ADPF" },
+            { name: "Wassernutzung (WDP)", code: "WDP" },
+            { name: "Erneuerbare Primärenergie als Energieträger (PERE)", code: "PERE" },
+            { name: "Erneuerbare Primärenergie zur stofflichen Nutzung (PERM)", code: "PERM" },
+            { name: "Total erneuerbare Primärenergie (PERT)", code: "PERT" },
+            { name: "Nicht-erneuerbare Primärenergie als Energieträger (PENRE)", code: "PENRE" },
+            { name: "Nicht-erneuerbare Primärenergie zur stofflichen Nutzung (PENRM)", code: "PENRM" },
+            { name: "Total nicht erneuerbare Primärenergie (PENRT)", code: "PENRT" },
+            { name: "Einsatz von Sekundärstoffen (SM)", code: "SM" },
+            { name: "Erneuerbare Sekundärbrennstoffe (RSF)", code: "RSF" },
+            { name: "Nicht erneuerbare Sekundärbrennstoffe (NRSF)", code: "NRSF" },
+            { name: "Einsatz von Süßwasserressourcen (FW)", code: "FW" },
+            { name: "Gefährlicher Abfall zur Deponie (HWD)", code: "HWD" },
+            { name: "Entsorgter nicht gefährlicher Abfall (NHWD)", code: "NHWD" },
+            { name: "Entsorgter radioaktiver Abfall (RWD)", code: "RWD" },
+            { name: "Komponenten für die Wiederverwendung (CRU)", code: "CRU" },
+            { name: "Stoffe zum Recycling (MFR)", code: "MFR" },
+            { name: "Stoffe für die Energierückgewinnung (MER)", code: "MER" },
+            { name: "Exportierte elektrische Energie (EEE)", code: "EEE" },
+            { name: "Exportierte thermische Energie (EET)", code: "EET" },
+            { name: "Auftreten von Krankheiten aufgrund von Feinstaubemissionen (PM)", code: "PM" },
+            { name: "Wirkung durch Exposition des Menschen mit U235 (IR)", code: "IR" },
+            { name: "Toxizitätsvergleichseinheit für Ökosysteme (ETP-fw)", code: "ETP-fw" },
+            { name: "Toxizitätsvergleichseinheit für Menschen (krebserregend) (HTP-c)", code: "HTP-c" },
+            { name: "Toxizitätsvergleichseinheit für Menschen (nicht krebserregend) (HTP-nc)", code: "HTP-nc" },
+            { name: "Bodenqualitätsindex (SQP)", code: "SQP" }
+        ];
+
+        const enRows = [
+            { name: "Global Warming Potential total (GWP-total)", code: "GWP-total" },
+            { name: "Global Warming Potential fossil fuels (GWP-fossil)", code: "GWP-fossil" },
+            { name: "Global Warming Potential biogenic (GWP-biogenic)", code: "GWP-biogenic" },
+            { name: "Global Warming Potential luluc (GWP-luluc)", code: "GWP-luluc" },
+            { name: "Depletion potential of the stratospheric ozone layer (ODP)", code: "ODP" },
+            { name: "Acidification potential of land and water (AP)", code: "AP" },
+            { name: "Eutrophication potential aquatic freshwater (EP-freshwater)", code: "EP-freshwater" },
+            { name: "Eutrophication potential aquatic marine (EP-marine)", code: "EP-marine" },
+            { name: "Eutrophication potential terrestrial (EP-terrestrial)", code: "EP-terrestrial" },
+            { name: "Formation potential of tropospheric ozone photochemical oxidants (POCP)", code: "POCP" },
+            { name: "Abiotic depletion potential for non fossil resources (ADPE)", code: "ADPE" },
+            { name: "Abiotic depletion potential for fossil resources (ADPF)", code: "ADPF" },
+            { name: "Water use (WDP)", code: "WDP" },
+            { name: "Renewable primary energy as energy carrier (PERE)", code: "PERE" },
+            { name: "Renewable primary energy resources as material utilization (PERM)", code: "PERM" },
+            { name: "Total use of renewable primary energy resources (PERT)", code: "PERT" },
+            { name: "Non renewable primary energy as energy carrier (PENRE)", code: "PENRE" },
+            { name: "Non renewable primary energy as material utilization (PENRM)", code: "PENRM" },
+            { name: "Total use of non renewable primary energy resources (PENRT)", code: "PENRT" },
+            { name: "Use of secondary material (SM)", code: "SM" },
+            { name: "Use of renewable secondary fuels (RSF)", code: "RSF" },
+            { name: "Use of non renewable secondary fuels (NRSF)", code: "NRSF" },
+            { name: "Use of net fresh water (FW)", code: "FW" },
+            { name: "Hazardous waste disposed (HWD)", code: "HWD" },
+            { name: "Non hazardous waste disposed (NHWD)", code: "NHWD" },
+            { name: "Radioactive waste disposed (RWD)", code: "RWD" },
+            { name: "Components for re-use (CRU)", code: "CRU" },
+            { name: "Materials for recycling (MFR)", code: "MFR" },
+            { name: "Materials for energy recovery (MER)", code: "MER" },
+            { name: "Exported electrical energy (EEE)", code: "EEE" },
+            { name: "Exported thermal energy (EET)", code: "EET" },
+            { name: "Incidence of disease due to PM emissions (PM)", code: "PM" },
+            { name: "Human exposure efficiency relative to U235 (IR)", code: "IR" },
+            { name: "Comparative toxic unit for ecosystems (ETP-fw)", code: "ETP-fw" },
+            { name: "Comparative toxic unit for humans (carcinogenic) (HTP-c)", code: "HTP-c" },
+            { name: "Comparative toxic unit for humans (noncarcinogenic) (HTP-nc)", code: "HTP-nc" },
+            { name: "Soil quality index (SQP)", code: "SQP" }
+        ];
 
         let currentWorkbook = null;
         let chartInstance = null;
@@ -251,7 +359,6 @@
 
         // --- Core Functions ---
         
-        // This function handles a file object (from drop/input)
         function handleFile(file) {
             errorMsg.style.display = 'none';
             const reader = new FileReader();
@@ -267,20 +374,16 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // NEW FUNCTION: Load the example file from the same directory
         async function loadExampleData() {
             errorMsg.style.display = 'none';
             const fileName = "example_data_results.xlsx";
             try {
-                // Fetch the file as an ArrayBuffer
                 const response = await fetch(fileName);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch ${fileName}: ${response.statusText}`);
                 }
                 const arrayBuffer = await response.arrayBuffer();
                 const data = new Uint8Array(arrayBuffer);
-
-                // Read the data using XLSX.js
                 const workbook = XLSX.read(data, {type: 'array'});
                 handleWorkbook(workbook);
                 alert('Example data loaded successfully!');
@@ -291,12 +394,10 @@
             }
         }
         
-        // NEW FUNCTION: Central handler for the workbook
         function handleWorkbook(workbook) {
             currentWorkbook = workbook;
             processDataAndRender(currentWorkbook);
         }
-
 
         function processDataAndRender(workbook) {
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -304,6 +405,7 @@
 
             if (jsonData.length < 2) { showError("File is empty or invalid."); return; }
 
+            // --- Existing Chart Logic ---
             const headerRow = jsonData[0]; 
             const useSplitA = splitACheck.checked;
             
@@ -318,7 +420,6 @@
             const chartData = { labels: [], datasets: {} };
             modules.forEach(m => chartData.datasets[m] = []);
 
-            // To store table data: Array of objects { category: "GWP", values: {A1: 10, A2: 20...} }
             const tableDataRows = [];
 
             const colIndices = {};
@@ -347,32 +448,21 @@
                 if (sumRest === 0) sumRest = 1;
 
                 chartData.labels.push(shortCode);
-                
-                // Store row for table
                 const tableRow = { category: shortCode, values: {} };
 
                 modules.forEach(m => {
-                    // Only modules that are part of the sum (A1-A5, C1-C4) are normalized to 100% of the sum.
-                    // Module D is included for chart display but should not factor into the 100% normalization base.
                     const isSumModule = m !== 'D';
-                    const valueForNormalization = isSumModule ? rowValues[m] : 0; // Use actual value for A modules, 0 for D
+                    const valueForNormalization = isSumModule ? rowValues[m] : 0; 
                     const pct = (valueForNormalization / sumRest) * 100;
                     
                     chartData.datasets[m].push(pct);
                     tableRow.values[m] = pct;
                 });
 
-                // Special handling for D for the chart stack (it should just use its value)
                 if (modules.includes('D')) {
                     const idx = colIndices['D'];
                     const val = (idx !== undefined && row[idx] != null) ? parseFloat(row[idx]) : 0;
                     const pctD = (val / sumRest) * 100;
-                    
-                    // Update dataset and table for 'D' using the calculated percentage
-                    // This is slightly complex because the chart has a separate stack for 'D'
-                    // but the table calculation needs to be consistent. 
-                    // Since 'D' is meant to be compared to the main A/C modules, keeping it relative to sumRest
-                    // for the table seems most logical for display, though chart.js handles the stacking.
                     chartData.datasets['D'][chartData.datasets['D'].length - 1] = pctD;
                     tableRow.values['D'] = pctD;
                 }
@@ -384,7 +474,124 @@
 
             renderChart(chartData.labels, chartData.datasets, modules);
             renderTable(tableDataRows, modules);
+
+            // --- TRIGGER TEMPLATE GENERATION ---
+            createAndDownloadTemplates(jsonData);
         }
+
+        // --- Excel Template Generation Logic ---
+
+        function getCode(text) {
+            if (!text) return null;
+            // Match content inside the last parenthesis
+            const matches = text.toString().match(/\(([^)]+)\)/g);
+            if (matches && matches.length > 0) {
+                const last = matches[matches.length - 1];
+                return last.replace('(', '').replace(')', '');
+            }
+            return null;
+        }
+
+        function createAndDownloadTemplates(sourceData) {
+            if (!sourceData || sourceData.length < 2) return;
+
+            const sourceHeaders = sourceData[0];
+            const dataMap = {}; 
+
+            // Map source data by code (e.g., "GWP-total" -> Row Data)
+            for (let i = 1; i < sourceData.length; i++) {
+                const row = sourceData[i];
+                const name = row[0] ? row[0].toString() : null; 
+                if (!name) continue;
+
+                let code = getCode(name);
+                
+                // --- FIX for 'IRP' -> 'IR' mismatch in OpenLCA output ---
+                if (code === "IRP" && name.includes("Human exposure efficiency relative to U235")) {
+                    code = "IR"; // Force the correct code for template lookup
+                }
+                // --------------------------------------------------------
+
+                if (code) {
+                    dataMap[code] = row;
+                }
+            }
+
+            // Helper to retrieve value from source based on column name
+            function getValue(code, targetColName) {
+                const sourceRow = dataMap[code];
+                if (!sourceRow) return "";
+                
+                // Note: The source file might have "A1-A3" but not "A1".
+                // We attempt to find the exact column name in source.
+                const colIndex = sourceHeaders.indexOf(targetColName);
+                if (colIndex !== -1) {
+                    return sourceRow[colIndex];
+                }
+                return "";
+            }
+
+            // Build the data array for the Excel sheet
+            function buildSheetData(rowDefinitions, headerColumns) {
+                const sheetData = [headerColumns]; // Header Row
+                
+                rowDefinitions.forEach(rowDef => {
+                    const newRow = [];
+                    // 1. Indicator Name
+                    newRow.push(rowDef.name);
+                    // 2. Exponential (Fixed Value "x")
+                    newRow.push("x"); 
+                    
+                    // 3. Map remaining columns
+                    for (let j = 2; j < headerColumns.length; j++) {
+                        const colName = headerColumns[j];
+                        newRow.push(getValue(rowDef.code, colName));
+                    }
+                    sheetData.push(newRow);
+                });
+                return sheetData;
+            }
+
+            const deData = buildSheetData(deRows, templateColumnsDE);
+            const enData = buildSheetData(enRows, templateColumnsEN);
+
+            // Clear previous links
+            const container = document.getElementById('download-links-area');
+            container.innerHTML = "<h4>Download IBU Upload Templates</h4>";
+
+            // Generate Links
+            createDownloadLink(deData, "LCA_Ergebnisse_DE.xls", "Download IBU DE (Excel)", container);
+            createDownloadLink(enData, "LCA_Results_EN.xls", "Download IBU EN (Excel)", container);
+        }
+
+        function createDownloadLink(aoaData, fileName, linkText, container) {
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(aoaData);
+            XLSX.utils.book_append_sheet(wb, ws, "Results");
+
+            // Write to binary
+            const wbout = XLSX.write(wb, {bookType:'xls', type:'binary'});
+
+            function s2ab(s) {
+                const buf = new ArrayBuffer(s.length);
+                const view = new Uint8Array(buf);
+                for (let i=0; i<s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+                return buf;
+            }
+
+            const blob = new Blob([s2ab(wbout)], {type: "application/octet-stream"});
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.innerText = linkText;
+            a.className = "template-btn";
+            
+            container.appendChild(a);
+        }
+
+        // --- Chart & Table Rendering Helpers ---
 
         function renderChart(labels, datasetsObj, moduleOrder) {
             const ctx = document.getElementById('myChart').getContext('2d');
@@ -398,7 +605,6 @@
                     label: mod,
                     data: datasetsObj[mod],
                     backgroundColor: moduleColorMap[mod] || "#999999",
-                    // The main modules stack on 'Stack_Main', D is isolated on 'Stack_D' to allow it to be an offset/comparison.
                     stack: isD ? 'Stack_D' : 'Stack_Main', 
                     barPercentage: 0.95, 
                     categoryPercentage: 0.65
@@ -438,8 +644,6 @@
                     },
                     scales: {
                         y: {
-                            // Stack Main to 100%, Stack D can exceed it or be negative.
-                            // Chart.js stacks separate groups automatically.
                             stacked: true, max: 100, 
                             title: { display: true, text: 'Contribution [%]', font: { weight: '600', size: 14 }, color: '#000000' },
                             ticks: { color: '#000000', font: { size: 12 } },
@@ -457,33 +661,27 @@
 
         function renderTable(dataRows, modules) {
             const table = document.getElementById('data-table');
-            table.innerHTML = ""; // Clear previous
+            table.innerHTML = ""; 
 
-            // 1. Header
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
             
-            // First column: Category
             const thCat = document.createElement('th');
             thCat.innerText = "Impact Category";
             headerRow.appendChild(thCat);
 
-            // Module columns
             modules.forEach(mod => {
                 const th = document.createElement('th');
                 th.innerText = mod;
-                // Add a small colored bottom border to link to chart
                 th.style.borderBottom = `3px solid ${moduleColorMap[mod] || '#999'}`;
                 headerRow.appendChild(th);
             });
             thead.appendChild(headerRow);
             table.appendChild(thead);
 
-            // 2. Body
             const tbody = document.createElement('tbody');
             dataRows.forEach(row => {
                 const tr = document.createElement('tr');
-                
                 const tdCat = document.createElement('td');
                 tdCat.innerText = row.category;
                 tr.appendChild(tdCat);
@@ -491,8 +689,8 @@
                 modules.forEach(mod => {
                     const td = document.createElement('td');
                     const val = row.values[mod];
-                    td.innerText = val.toFixed(2); // Show 2 decimal places
-                    if (val === 0) td.style.color = "#ccc"; // Grey out zeros
+                    td.innerText = val.toFixed(2);
+                    if (val === 0) td.style.color = "#ccc";
                     tr.appendChild(td);
                 });
 
@@ -515,7 +713,6 @@
         }
 
         function copyTable() {
-            // Create a temporary text element to copy from
             const table = document.getElementById('data-table');
             let range, selection;
 
