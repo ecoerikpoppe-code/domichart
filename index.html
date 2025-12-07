@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dominance Analysis Chart from Open LCA</title>
+    
+    <!-- Load required libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #1A5D8D;
+            --bg: #f4f4f9;
+        }
+        body {
+            font-family: 'Barlow', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { color: #000; margin-bottom: 10px; font-weight: 600; }
+        p { color: #444; margin-bottom: 20px; }
+
+        /* Drop Zone */
+        #drop-zone {
+            width: 80%;
+            max-width: 800px;
+            height: 150px;
+            border: 3px dashed #666;
+            border-radius: 10px;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            cursor: pointer;
+            transition: border-color 0.3s, background-color 0.3s;
+            margin-bottom: 30px;
+        }
+        #drop-zone.dragover {
+            border-color: var(--primary);
+            background-color: #e6f0fa;
+        }
+        #drop-zone p { margin: 0; font-size: 1.1em; pointer-events: none; color: #000; }
+        
+        /* Main Container */
+        #chart-container {
+            width: 90%;
+            max-width: 1000px; 
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: none; 
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 500px;
+            width: 100%;
+            margin-bottom: 40px; /* Space between chart and table */
+        }
+        
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 20px;
+            font-size: 1em;
+            color: #000;
+        }
+        
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button.action-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: 'Barlow', sans-serif;
+            font-size: 0.9em;
+        }
+        button.action-btn.secondary {
+            background-color: #555;
+        }
+        button.action-btn:hover { opacity: 0.9; }
+
+        .error { color: #d32f2f; margin-top: 10px; display: none; }
+
+        /* --- TABLE STYLES --- */
+        #data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+        #data-table th, #data-table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: right;
+            color: #000;
+        }
+        #data-table th:first-child, #data-table td:first-child {
+            text-align: left;
+            font-weight: 600;
+        }
+        #data-table th {
+            background-color: #f8f9fa;
+            position: sticky;
+            top: 0;
+            font-weight: 600;
+        }
+        #data-table tr:nth-child(even) {
+            background-color: #fcfcfc;
+        }
+        #data-table tr:hover {
+            background-color: #f0f4f8;
+        }
+        .table-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #000;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>domiChart - Dominance Analysis Charts from Open LCA</h1>
+    <p>Drop your OpenLCA Excel export below to generate the chart and data table.</p>
+
+    <div id="drop-zone">
+        <p>Drag & Drop Excel file here</p>
+        <p style="font-size: 0.8em; color: #555;">(or click to browse)</p>
+        <input type="file" id="file-input" style="display: none;" accept=".xlsx, .xls">
+    </div>
+
+    <div id="error-msg" class="error"></div>
+
+    <div id="chart-container">
+        <div class="controls">
+            <label>
+                <input type="checkbox" id="split-a-check"> Use split A modules (A1, A2, A3)
+            </label>
+        </div>
+        
+        <div class="chart-wrapper">
+            <canvas id="myChart"></canvas>
+        </div>
+
+        <div class="table-title">Detailed Contributions [%]</div>
+        <div style="overflow-x: auto;">
+            <table id="data-table">
+                <!-- Table content generated by JS -->
+            </table>
+        </div>
+        
+        <div class="btn-group">
+            <button class="action-btn" onclick="downloadChart()">Download Chart Image</button>
+            <button class="action-btn secondary" onclick="copyTable()">Copy Table to Clipboard</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        Chart.defaults.color = '#000000';
+        Chart.defaults.font.family = "'Barlow', sans-serif";
+        Chart.defaults.font.weight = '500';
+
+        const impactCategories = [
+            "GWP-t", "ODP", "AP", "EP-fw", "EP-m",
+            "EP-t", "POCP", "ADPf", "ADPe", "WDP", "PERT", "PENRT"
+        ];
+
+        const mapping = {
+            "GWP-t": "Global Warming Potential - total",
+            "ODP": "Depletion potential of the stratospheric ozone layer (ODP)",
+            "AP": "Acidification potential",
+            "EP-fw": "Eutrophication potential - freshwater",
+            "EP-m": "Eutrophication potential - marine",
+            "EP-t": "Eutrophication potential - terrestrial",
+            "POCP": "Photochemical Ozone Creation Potential",
+            "ADPf": "Abiotic depletion potential - fossil",
+            "ADPe": "Abiotic depletion potential - non-fossil resources",
+            "WDP": "Water (user) deprivation potential",
+            "PERT": "Total use of renewable primary energy resources",
+            "PENRT": "Total use of non renewable primary energy resources",
+        };
+
+        // Updated High Contrast / Mixed Palette
+        const moduleColorMap = {
+            "A1":    "#2962FF",  // Option 1 Blue
+            "A1-A3": "#2962FF",  // Option 1 Blue
+            "A2":    "#FFD600",  // Bright Yellow
+            "A3":    "#D50000",  // Deep Red
+            "A4":    "#FFAB00",  // Amber
+            "A5":    "#00C853",  // Vivid Green
+            "C1":    "#6200EA",  // Deep Violet
+            "C2":    "#FFC400",  // Gold
+            "C3":    "#FF1744",  // Bright Red / Pinkish
+            "C4":    "#3E2723",  // Dark Brown
+            "D":     "#8FAFBC"   // Neutral
+        };
+
+        let currentWorkbook = null;
+        let chartInstance = null;
+
+        // --- Event Listeners ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const errorMsg = document.getElementById('error-msg');
+        const splitACheck = document.getElementById('split-a-check');
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleFile(e.target.files[0]); });
+        splitACheck.addEventListener('change', () => { if (currentWorkbook) processDataAndRender(currentWorkbook); });
+
+        // --- Logic ---
+        function handleFile(file) {
+            errorMsg.style.display = 'none';
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                try {
+                    currentWorkbook = XLSX.read(data, {type: 'array'});
+                    processDataAndRender(currentWorkbook);
+                } catch (err) {
+                    showError("Could not parse Excel file. Ensure it is a valid OpenLCA export.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processDataAndRender(workbook) {
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+
+            if (jsonData.length < 2) { showError("File is empty or invalid."); return; }
+
+            const headerRow = jsonData[0]; 
+            const useSplitA = splitACheck.checked;
+            
+            const moduleCandidates = useSplitA 
+                ? ["A1", "A2", "A3", "A4", "A5", "C1", "C2", "C3", "C4", "D"]
+                : ["A1-A3", "A4", "A5", "C1", "C2", "C3", "C4", "D"];
+
+            const modules = moduleCandidates.filter(m => headerRow.includes(m));
+
+            if (modules.length === 0) { showError("No valid module columns found."); return; }
+
+            const colIndices = {};
+            headerRow.forEach((col, index) => { if (typeof col === 'string') colIndices[col] = index; });
+            const impactCatIndex = colIndices["Impact category"];
+
+            if (impactCatIndex === undefined) { showError("Column 'Impact category' not found."); return; }
+
+            const chartData = { labels: [], datasets: {} };
+            modules.forEach(m => chartData.datasets[m] = []);
+
+            // To store table data: Array of objects { category: "GWP", values: {A1: 10, A2: 20...} }
+            const tableDataRows = [];
+
+            impactCategories.forEach(shortCode => {
+                const searchPattern = mapping[shortCode];
+                if (!searchPattern) return;
+
+                const row = jsonData.find(r => r[impactCatIndex] && r[impactCatIndex].toString().includes(searchPattern));
+                if (!row) return;
+
+                let sumRest = 0;
+                const rowValues = {};
+
+                modules.forEach(m => {
+                    const idx = colIndices[m];
+                    const val = (idx !== undefined && row[idx] != null) ? parseFloat(row[idx]) : 0;
+                    rowValues[m] = val;
+                    if (m !== 'D') sumRest += val;
+                });
+
+                if (sumRest === 0) sumRest = 1;
+
+                chartData.labels.push(shortCode);
+                
+                // Store row for table
+                const tableRow = { category: shortCode, values: {} };
+
+                modules.forEach(m => {
+                    const pct = (rowValues[m] / sumRest) * 100;
+                    chartData.datasets[m].push(pct);
+                    tableRow.values[m] = pct;
+                });
+
+                tableDataRows.push(tableRow);
+            });
+
+            if (chartData.labels.length === 0) { showError("No matching impact categories found."); return; }
+
+            renderChart(chartData.labels, chartData.datasets, modules);
+            renderTable(tableDataRows, modules);
+        }
+
+        function renderChart(labels, datasetsObj, moduleOrder) {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            document.getElementById('chart-container').style.display = 'block';
+
+            if (chartInstance) chartInstance.destroy();
+
+            const chartDatasets = moduleOrder.map(mod => {
+                const isD = mod === 'D';
+                return {
+                    label: mod,
+                    data: datasetsObj[mod],
+                    backgroundColor: moduleColorMap[mod] || "#999999",
+                    stack: isD ? 'Stack_D' : 'Stack_Main', 
+                    barPercentage: 0.95, 
+                    categoryPercentage: 0.65
+                };
+            });
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: labels, datasets: chartDatasets },
+                options: {
+                    devicePixelRatio: 4,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Relative impact contributions per module (incl. D)',
+                            font: { size: 18, family: "'Barlow', sans-serif", weight: '600' },
+                            color: '#000000',
+                            padding: { bottom: 20 }
+                        },
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#000000',
+                                font: { family: "'Barlow', sans-serif", size: 12 },
+                                boxWidth: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            stacked: true, max: 100,
+                            title: { display: true, text: 'Contribution [%]', font: { weight: '600', size: 14 }, color: '#000000' },
+                            ticks: { color: '#000000', font: { size: 12 } },
+                            grid: { borderDash: [4, 4], color: '#e0e0e0' }
+                        },
+                        x: {
+                            stacked: true,
+                            title: { display: true, text: 'Impact Categories', font: { weight: '600', size: 14 }, color: '#000000' },
+                            ticks: { color: '#000000', font: { size: 12, weight: '500' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTable(dataRows, modules) {
+            const table = document.getElementById('data-table');
+            table.innerHTML = ""; // Clear previous
+
+            // 1. Header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            
+            // First column: Category
+            const thCat = document.createElement('th');
+            thCat.innerText = "Impact Category";
+            headerRow.appendChild(thCat);
+
+            // Module columns
+            modules.forEach(mod => {
+                const th = document.createElement('th');
+                th.innerText = mod;
+                // Add a small colored bottom border to link to chart
+                th.style.borderBottom = `3px solid ${moduleColorMap[mod] || '#999'}`;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // 2. Body
+            const tbody = document.createElement('tbody');
+            dataRows.forEach(row => {
+                const tr = document.createElement('tr');
+                
+                const tdCat = document.createElement('td');
+                tdCat.innerText = row.category;
+                tr.appendChild(tdCat);
+
+                modules.forEach(mod => {
+                    const td = document.createElement('td');
+                    const val = row.values[mod];
+                    td.innerText = val.toFixed(2); // Show 2 decimal places
+                    if (val === 0) td.style.color = "#ccc"; // Grey out zeros
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+        }
+
+        function showError(msg) {
+            errorMsg.innerText = msg;
+            errorMsg.style.display = 'block';
+            document.getElementById('chart-container').style.display = 'none';
+        }
+
+        function downloadChart() {
+            const link = document.createElement('a');
+            link.download = 'LCA_Dominance_Chart.png';
+            link.href = document.getElementById('myChart').toDataURL('image/png', 1.0);
+            link.click();
+        }
+
+        function copyTable() {
+            // Create a temporary text element to copy from
+            const table = document.getElementById('data-table');
+            let range, selection;
+
+            if (document.createRange && window.getSelection) {
+                range = document.createRange();
+                selection = window.getSelection();
+                selection.removeAllRanges();
+                try {
+                    range.selectNodeContents(table);
+                    selection.addRange(range);
+                } catch (e) {
+                    range.selectNode(table);
+                    selection.addRange(range);
+                }
+                document.execCommand('copy');
+                selection.removeAllRanges();
+                alert('Table copied to clipboard!');
+            }
+        }
+    </script>
+</body>
+</html>
